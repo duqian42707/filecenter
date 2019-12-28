@@ -13,7 +13,10 @@ import javax.annotation.Resource;
  * @date 2019-08-21
  */
 @Component
-public class RemoteFileHandler implements IntegrationFileHandler {
+public class RemoteFileHandler extends AbstractFileHandler {
+
+    private FileStoreType fileStoreType = FileStoreType.remote;
+
     @Resource
     private RestTemplate restTemplate;
 
@@ -23,6 +26,10 @@ public class RemoteFileHandler implements IntegrationFileHandler {
         throw new RuntimeException("该存储方式不支持上传！");
     }
 
+    @Override
+    public FileStoreType getFileStoreType() {
+        return this.fileStoreType;
+    }
 
     /**
      * 从远程下载文件，只需知道文件的下载地址即可。
@@ -40,8 +47,4 @@ public class RemoteFileHandler implements IntegrationFileHandler {
         return bytes;
     }
 
-    @Override
-    public boolean support(String storeType) {
-        return FileStoreType.Remote.getValue().equals(storeType);
-    }
 }

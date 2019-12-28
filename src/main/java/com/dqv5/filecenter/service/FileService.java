@@ -2,6 +2,7 @@ package com.dqv5.filecenter.service;
 
 import com.alibaba.fastjson.JSONObject;
 import com.dqv5.filecenter.entity.FilecenterInfo;
+import com.dqv5.filecenter.enums.FileStoreType;
 import com.dqv5.filecenter.pojo.FileInfo;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,8 @@ public interface FileService {
 
     FileInfo upload(MultipartFile file) throws IOException;
 
+    FileInfo upload(MultipartFile file, String storeType) throws IOException;
+
     FileInfo getFileInfo(String id);
 
     /**
@@ -41,4 +44,7 @@ public interface FileService {
     void delete(String id);
 
 
+    List<FileStoreType> getEnableStoreTypes();
+
+    FileStoreType getDefaultStoreType();
 }

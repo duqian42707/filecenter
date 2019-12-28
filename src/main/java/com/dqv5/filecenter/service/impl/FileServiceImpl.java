@@ -6,12 +6,11 @@ import com.dqv5.filecenter.exception.NoSuchFileException;
 import com.dqv5.filecenter.pojo.FileInfo;
 import com.dqv5.filecenter.repository.FilecenterInfoRepository;
 import com.dqv5.filecenter.service.FileService;
-import com.dqv5.filecenter.support.IntegrationFileHandler;
+import com.dqv5.filecenter.support.AbstractFileHandler;
 import com.dqv5.filecenter.util.ZipUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,8 +18,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
-import sun.misc.BASE64Decoder;
-import sun.misc.BASE64Encoder;
 
 import javax.annotation.Resource;
 import java.io.ByteArrayOutputStream;
@@ -28,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author duqian
@@ -40,15 +38,14 @@ public class FileServiceImpl implements FileService {
     private FilecenterInfoRepository filecenterInfoRepository;
 
     @Resource
-    private List<IntegrationFileHandler> fileHandlers;
+    private List<AbstractFileHandler> fileHandlers;
 
 
     /**
-     * 上传时的储存方式
-     *
+     * 默认的储存方式
      */
-    @Value("${filecenter.uploadStoreType:1}")
-    private String uploadStoreType;
+    @Value("${filecenter.defaultStoreType:3}")
+    private String defaultStoreType;
 
 
     private String dir = "/opt/data/";
@@ -70,6 +67,11 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public FileInfo upload(MultipartFile file) throws IOException {
+        return this.upload(file, defaultStoreType);
+    }
+
+    @Override
+    public FileInfo upload(MultipartFile file, String uploadStoreType) throws IOException {
         String filename = file.getOriginalFilename();
         InputStream inputStream = null;
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -78,7 +80,7 @@ public class FileServiceImpl implements FileService {
         byte[] data = outputStream.toByteArray();
         outputStream.close();
         inputStream.close();
-        return this.upload(data, filename);
+        return this.upload(data, filename, uploadStoreType);
     }
 
 
@@ -104,15 +106,15 @@ public class FileServiceImpl implements FileService {
      */
     @Override
     public void transferRemoteFile() throws IOException {
-        String remoteStoreType = FileStoreType.Remote.getValue();
-        if (this.uploadStoreType.equals(remoteStoreType)) {
+        String remoteStoreType = FileStoreType.remote.getValue();
+        if (this.defaultStoreType.equals(remoteStoreType)) {
             return;
         }
         List<FilecenterInfo> all = this.filecenterInfoRepository.findByStoreType(remoteStoreType);
         for (FilecenterInfo filecenterInfo : all) {
             String originalStoreInfo = filecenterInfo.getStoreInfo();
             String fileName = filecenterInfo.getFilename();
-            IntegrationFileHandler remoteFileHandler = getSupportFileHandler(remoteStoreType);
+            AbstractFileHandler remoteFileHandler = getSupportFileHandler(remoteStoreType);
             byte[] data = null;
             try {
                 data = remoteFileHandler.download(originalStoreInfo);
@@ -120,9 +122,9 @@ public class FileServiceImpl implements FileService {
                 log.info("转存远程文件异常：文件下载失败：" + e.getMessage());
                 continue;
             }
-            IntegrationFileHandler fileHandler = getSupportFileHandler(this.uploadStoreType);
+            AbstractFileHandler fileHandler = getSupportFileHandler(this.defaultStoreType);
             String storeInfo = fileHandler.upload(data, fileName);
-            filecenterInfo.setStoreType(this.uploadStoreType);
+            filecenterInfo.setStoreType(this.defaultStoreType);
             filecenterInfo.setStoreInfo(storeInfo);
             this.filecenterInfoRepository.save(filecenterInfo);
             log.debug("转存远程文件" + fileName + "成功");
@@ -134,7 +136,7 @@ public class FileServiceImpl implements FileService {
     public FileInfo download(String id) throws IOException {
         FileInfo fileInfo = this.getFileInfo(id);
         String storeType = fileInfo.getStoreType();
-        IntegrationFileHandler fileHandler = getSupportFileHandler(storeType);
+        AbstractFileHandler fileHandler = getSupportFileHandler(storeType);
         String storeInfo = fileInfo.getStoreInfo();
         byte[] data = fileHandler.download(storeInfo);
         fileInfo.setData(data);
@@ -159,7 +161,7 @@ public class FileServiceImpl implements FileService {
         return md5;
     }
 
-    public FileInfo upload(byte[] data, String fileName) throws IOException {
+    public FileInfo upload(byte[] data, String fileName, String fileStoreType) throws IOException {
         String fileType = "unknown";
         if (fileName.contains(".")) {
             fileType = fileName.substring(fileName.lastIndexOf("."));
@@ -178,7 +180,7 @@ public class FileServiceImpl implements FileService {
 //            for (FilecenterInfo info : fileCenterInfoList) {
 //                try {
 //                    // 尝试下载
-//                    IntegrationFileHandler fileHandler = getSupportFileHandler(info.getStoreType());
+//                    AbstractFileHandler fileHandler = getSupportFileHandler(info.getStoreType());
 //                    String storeInfo1 = info.getStoreInfo();
 //                    byte[] download = fileHandler.download(storeInfo1);
 //                    if (download != null) {
@@ -195,8 +197,8 @@ public class FileServiceImpl implements FileService {
             storeType = existInfo.getStoreType();
             storeInfo = existInfo.getStoreInfo();
         } else {
-            IntegrationFileHandler fileHandler = getSupportFileHandler(this.uploadStoreType);
-            storeType = this.uploadStoreType;
+            AbstractFileHandler fileHandler = getSupportFileHandler(fileStoreType);
+            storeType = fileStoreType;
             storeInfo = fileHandler.upload(data, fileName);
         }
         long length = data.length;
@@ -213,7 +215,7 @@ public class FileServiceImpl implements FileService {
                 .id(filecenterInfo.getId())
                 .length(length)
                 .filename(fileName)
-                .storeType(this.uploadStoreType)
+                .storeType(this.defaultStoreType)
                 .storeInfo(storeInfo)
                 .uploadDate(now)
                 .type(fileType)
@@ -221,8 +223,8 @@ public class FileServiceImpl implements FileService {
                 .build();
     }
 
-    private IntegrationFileHandler getSupportFileHandler(String storeType) {
-        for (IntegrationFileHandler fileHandler : fileHandlers) {
+    private AbstractFileHandler getSupportFileHandler(String storeType) {
+        for (AbstractFileHandler fileHandler : fileHandlers) {
             if (fileHandler.support(storeType)) {
                 return fileHandler;
             }
@@ -264,9 +266,23 @@ public class FileServiceImpl implements FileService {
     @Override
     public void delete(String id) {
         this.filecenterInfoRepository.findById(id).ifPresent((one) -> {
-            this.filecenterInfoRepository.delete(one);
+            one.setIsDelete(1);
+            this.filecenterInfoRepository.save(one);
         });
     }
 
+    @Override
+    public List<FileStoreType> getEnableStoreTypes() {
+        List<FileStoreType> collect = fileHandlers.stream()
+                .map(item -> item.getFileStoreType())
+                .filter(item -> item != FileStoreType.remote)
+                .collect(Collectors.toList());
+        return collect;
+    }
 
+    @Override
+    public FileStoreType getDefaultStoreType() {
+        FileStoreType fileStoreType = FileStoreType.valueOf(this.defaultStoreType);
+        return fileStoreType;
+    }
 }

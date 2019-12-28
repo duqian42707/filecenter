@@ -8,40 +8,75 @@
   <script src="https://cdn.bootcss.com/axios/0.19.0/axios.min.js"></script>
   <script src="https://cdn.bootcss.com/vue/2.6.10/vue.min.js"></script>
   <script src="https://cdn.bootcss.com/element-ui/2.12.0/index.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    #app {
+      margin: 10px;
+    }
+
+    .upload-btn {
+      display: inline-block;
+      margin-right: 10px;
+    }
+
+    .pagination {
+      float: right;
+    }
+  </style>
 </head>
 <body>
 <div id="app">
   <template>
     <h1> File Center works!</h1>
-    <h2> Total Size:{{totalSize}}</h2>
-    <el-upload
-            :show-file-list="false"
-            action="file"
-            multiple
-            :on-success="loadList"
-            :limit="3">
-      <el-button type="primary">点击上传</el-button>
-      <div slot="tip" class="el-upload__tip">不超过1Mb</div>
+    <h2> Total Size: {{totalSize}}</h2>
+    <el-upload v-for="item in supportUploadTypes"
+               class="upload-btn"
+               :show-file-list="false"
+               :action="item.url"
+               :on-success="loadList"
+               :on-error="uploadError"
+               :limit="3">
+      <el-button type="primary">
+        点击上传({{item.name}})
+        <span v-if="item.def">(默认)</span>
+      </el-button>
     </el-upload>
 
+    <el-pagination
+            class="pagination"
+            background
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            :page-sizes="[10, 20, 50, 100]"
+            :current-page="pageNum"
+            :page-size="pageSize"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper">
+    </el-pagination>
     <el-table :data="tableData" border size="small" style="width: 100%" max-height="700">
-      <el-table-column fixed prop="filename" label="文件名"></el-table-column>
+      <el-table-column fixed prop="filename" label="文件名" width="300"></el-table-column>
       <el-table-column prop="type" label="文件类型" width="100"></el-table-column>
       <el-table-column prop="fileSize" label="文件大小" width="100"></el-table-column>
       <el-table-column prop="uploadDate" label="上传时间" width="200"></el-table-column>
       <el-table-column prop="md5" label="md5" width="330"></el-table-column>
       <el-table-column prop="storeType" label="存储类型" width="120"></el-table-column>
-      <el-table-column prop="storeInfo" label="存储详情"></el-table-column>
-      <el-table-column fixed="right" label="操作" width="200">
+      <el-table-column prop="storeInfo" label="存储详情" width="500"></el-table-column>
+      <el-table-column fixed="right" label="操作" width="320">
         <template slot-scope="scope">
-          <el-button @click="preview(scope.row)" type="text">查看</el-button>
-          <el-button @click="download(scope.row)" type="text">下载</el-button>
-          <el-button @click="deleteFile(scope.row)" type="text">删除</el-button>
+          <el-button @click="preview(scope.row)" type="primary" size="mini">查看</el-button>
+          <el-button @click="download(scope.row)" type="primary" size="mini">下载</el-button>
+          <el-button @click="copyLink(scope.row)" type="primary" size="mini">复制链接</el-button>
+          <el-button @click="deleteFile(scope.row)" type="danger" size="mini">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <el-pagination
+            class="pagination"
             background
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -60,6 +95,8 @@
         data() {
             return {
                 totalSize: null,
+                supportUploadTypes: [],
+                defaultStoreType: null,
                 tableData: [],
                 pageNum: 1,
                 pageSize: 10,
@@ -67,6 +104,11 @@
             }
         },
         methods: {
+            uploadError(err) {
+                console.log(err);
+                const msg = JSON.parse(err.message).message;
+                this.$message.error(msg);
+            },
             handleSizeChange(val) {
                 this.pageSize = val;
                 this.loadList();
@@ -83,11 +125,17 @@
                         i.fileSize = this.formatSize(i.length);
                         return i;
                     });
+                }).catch(err => {
+                    this.$message.error('错了哦，这是一条错误消息');
                 })
             },
             status() {
                 axios(`status`).then(res => {
-                    this.totalSize = this.formatSize(res.data.data);
+                    this.supportUploadTypes = res.data.data.supportUploadTypes;
+                    this.defaultUploadType = res.data.data.defaultUploadType;
+                    this.totalSize = this.formatSize(res.data.data.totalSize);
+                }).catch(err => {
+
                 })
             },
             preview(row) {
@@ -95,6 +143,11 @@
             },
             download(row) {
                 window.open(`file/${row.id}?t=1`);
+            },
+            copyLink(row) {
+                const link = window.location.host + `/file/${row.id}`;
+                console.log(link);
+                this.copyToClipboard(link);
             },
             deleteFile(row) {
                 axios.delete(`file/${row.id}`).then(res => {
@@ -110,6 +163,46 @@
                 const index = Math.floor(Math.log(srcsize) / Math.log(1024));
                 const size = srcsize / Math.pow(1024, index);
                 return size.toFixed(2) + unitArr[index];
+            },
+            /**
+             * 鼠标点击实现复制文字
+             * @param str
+             * @returns {boolean}
+             */
+            copyToClipboard(str) {
+                // create hidden text element, if it doesn't already exist
+                var targetId = "_hiddenCopyText_";
+                var origSelectionStart, origSelectionEnd;
+                // must use a temporary form element for the selection and copy
+                target = document.getElementById(targetId);
+                if (!target) {
+                    var target = document.createElement("textarea");
+                    target.style.position = "absolute";
+                    target.style.left = "-9999px";
+                    target.style.top = "0";
+                    target.id = targetId;
+                    document.body.appendChild(target);
+                }
+                target.textContent = str;
+                // select the content
+                var currentFocus = document.activeElement;
+                target.focus();
+                target.setSelectionRange(0, target.value.length);
+
+                // copy the selection
+                var succeed;
+                try {
+                    succeed = document.execCommand("copy");
+                } catch (e) {
+                    succeed = false;
+                }
+                // restore original focus
+                if (currentFocus && typeof currentFocus.focus === "function") {
+                    currentFocus.focus();
+                }
+                // clear temporary content
+                target.textContent = "";
+                return succeed;
             }
         },
         mounted() {

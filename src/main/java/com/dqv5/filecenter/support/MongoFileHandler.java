@@ -28,12 +28,21 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  */
 @Component
 @Profile("mongo")
-public class MongoFileHandler implements IntegrationFileHandler {
+public class MongoFileHandler extends AbstractFileHandler {
+
+
+    private FileStoreType fileStoreType = FileStoreType.mongo;
+
 
     @Resource
     private GridFSBucket gridFsBucket;
     @Resource
     private GridFsTemplate gridFsTemplate;
+
+    @Override
+    public FileStoreType getFileStoreType() {
+        return this.fileStoreType;
+    }
 
     /**
      * @param data     文件byte数组
@@ -75,11 +84,6 @@ public class MongoFileHandler implements IntegrationFileHandler {
         return data;
     }
 
-
-    @Override
-    public boolean support(String storeType) {
-        return FileStoreType.Mongo.getValue().equals(storeType);
-    }
 
     private GridFsResource convertGridFsFile2Resource(GridFSFile gridFsFile) {
         GridFSDownloadStream gridFsDownloadStream = gridFsBucket.openDownloadStream(gridFsFile.getObjectId());

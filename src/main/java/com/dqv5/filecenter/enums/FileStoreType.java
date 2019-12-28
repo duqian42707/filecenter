@@ -13,7 +13,7 @@ public enum FileStoreType {
     /**
      * 文件存储类型
      */
-    Remote("0", "网络地址"), Mongo("1", "Mongo"), HDFS("2", "HDFS"), Disk("3", "本地磁盘"), Ftp("4", "ftp");
+    remote("remote", "网络地址"), mongo("mongo", "Mongo"), hdfs("hdfs", "HDFS"), disk("disk", "本地磁盘"), ftp("ftp", "ftp");
 
     private String value;
     private String name;

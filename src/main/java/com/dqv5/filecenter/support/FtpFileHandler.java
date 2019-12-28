@@ -1,7 +1,6 @@
 package com.dqv5.filecenter.support;
 
 import com.dqv5.filecenter.enums.FileStoreType;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.net.ftp.FTPClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -9,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -21,7 +19,10 @@ import java.util.UUID;
  */
 @Component
 @Profile("ftp")
-public class FtpFileHandler implements IntegrationFileHandler {
+public class FtpFileHandler extends AbstractFileHandler {
+
+    private FileStoreType fileStoreType = FileStoreType.ftp;
+
 
     @Value("${filecenter.ftp.host}")
     private String host;
@@ -33,6 +34,11 @@ public class FtpFileHandler implements IntegrationFileHandler {
     private String rootPath;
 
     private DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    @Override
+    public FileStoreType getFileStoreType() {
+        return this.fileStoreType;
+    }
 
     @Override
     public String upload(byte[] data, String fileName) throws IOException {
@@ -98,8 +104,4 @@ public class FtpFileHandler implements IntegrationFileHandler {
         return data;
     }
 
-    @Override
-    public boolean support(String storeType) {
-        return FileStoreType.Ftp.getValue().equals(storeType);
-    }
 }

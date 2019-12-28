@@ -1,6 +1,8 @@
 package com.dqv5.filecenter.web;
 
+import com.alibaba.fastjson.JSONObject;
 import com.dqv5.filecenter.entity.FilecenterInfo;
+import com.dqv5.filecenter.enums.FileStoreType;
 import com.dqv5.filecenter.pojo.FileInfo;
 import com.dqv5.filecenter.pojo.CommonReturn;
 import com.dqv5.filecenter.pojo.CommonReturnEntity;
@@ -24,6 +26,8 @@ import javax.annotation.Resource;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author duqian
@@ -39,7 +43,19 @@ public class FileController {
     @GetMapping(value = "/status")
     public ResponseEntity<CommonReturnEntity> totalSize() {
         long size = fileService.totalSize();
-        return CommonReturn.build(true, "操作成功", size);
+        List<FileStoreType> enableStoreTypes = fileService.getEnableStoreTypes();
+        FileStoreType defaultStoreType = fileService.getDefaultStoreType();
+        List<JSONObject> collect = enableStoreTypes.stream().map(item -> {
+            JSONObject store = new JSONObject();
+            store.put("name", item.getName());
+            store.put("def", defaultStoreType == item);
+            store.put("url", "file/" + item.getValue());
+            return store;
+        }).collect(Collectors.toList());
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("totalSize", size);
+        jsonObject.put("supportUploadTypes", collect);
+        return CommonReturn.build(true, "操作成功", jsonObject);
     }
 
     @GetMapping("/files")
@@ -49,6 +65,7 @@ public class FileController {
                 .like(StringUtils.isNotBlank(type), "type", "%" + type + "%")
                 .like(StringUtils.isNotBlank(md5), "md5", "%" + md5 + "%")
                 .eq(StringUtils.isNotBlank(storeType), "storeType", storeType)
+                .eq("isDelete", 0)
                 .build();
         Sort sort = Sort.by(Sort.Direction.DESC, "uploadDate")
                 .and(Sort.by(Sort.Direction.ASC, "id"));
@@ -71,6 +88,13 @@ public class FileController {
         return CommonReturn.build(true, "文件上传成功！", fileInfo);
     }
 
+    @ApiOperation(value = "上传文件,指定存储方式", notes = "上传文件,参数为上传的文件,若上传成功，会返回文件信息")
+    @PostMapping("/file/{storeType}")
+    public ResponseEntity<CommonReturnEntity> fileUpload(@PathVariable String storeType, @RequestParam("file") MultipartFile file) throws IOException {
+        FileInfo fileInfo = this.fileService.upload(file, storeType);
+        return CommonReturn.build(true, "文件上传成功！", fileInfo);
+    }
+
     @ApiOperation(value = "获取文件", notes = "获取文件,参数为id")
     @ApiImplicitParam(name = "id", value = "文件标识", required = true, defaultValue = "5a435fd1dd5174442034c0fa", dataType = "String", paramType = "path")
     @GetMapping("/file/{id}")
@@ -87,7 +111,7 @@ public class FileController {
     @ApiOperation(value = "删除文件", notes = "删除文件,参数为id,成功或失败信息在响应体中")
     @ApiImplicitParam(name = "id", value = "文件标识", required = true, defaultValue = "5a435fd1dd5174442034c0fa", dataType = "String", paramType = "path")
     @DeleteMapping("/file/{id}")
-    public ResponseEntity<CommonReturnEntity> deleteGfsFile(@PathVariable String id) {
+    public ResponseEntity<CommonReturnEntity> deleteFile(@PathVariable String id) {
         this.fileService.delete(id);
         return CommonReturn.build(true, "删除成功");
     }

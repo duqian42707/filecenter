@@ -23,12 +23,19 @@ import java.util.UUID;
 @Component
 @Profile("disk")
 @Slf4j
-public class DiskFileHandler implements IntegrationFileHandler {
+public class DiskFileHandler extends AbstractFileHandler {
+
+    private FileStoreType fileStoreType = FileStoreType.disk;
 
     @Value("${filecenter.disk.rootPath:/data/tempFile/}")
     private String rootPath;
 
     private DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    @Override
+    public FileStoreType getFileStoreType() {
+        return this.fileStoreType;
+    }
 
     /**
      * @param data     文件byte数组
@@ -72,8 +79,4 @@ public class DiskFileHandler implements IntegrationFileHandler {
         return FileUtils.readFileToByteArray(file);
     }
 
-    @Override
-    public boolean support(String storeType) {
-        return FileStoreType.Disk.getValue().equals(storeType);
-    }
 }

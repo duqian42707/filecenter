@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import java.io.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Properties;
 import java.util.UUID;
 
 
@@ -26,7 +25,10 @@ import java.util.UUID;
 @Component
 @Profile("hdfs")
 @Slf4j
-public class HdfsFileHandler implements IntegrationFileHandler {
+public class HdfsFileHandler extends AbstractFileHandler {
+
+    private FileStoreType fileStoreType = FileStoreType.hdfs;
+
     @Value("${filecenter.hdfs.url}")
     private String hdfsUrl;
 
@@ -36,6 +38,11 @@ public class HdfsFileHandler implements IntegrationFileHandler {
     private FileSystem fs;
 
     private DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    @Override
+    public FileStoreType getFileStoreType() {
+        return this.fileStoreType;
+    }
 
     /**
      * @param data     文件byte数组
@@ -75,11 +82,6 @@ public class HdfsFileHandler implements IntegrationFileHandler {
         outputStream.close();
         inputStream.close();
         return data;
-    }
-
-    @Override
-    public boolean support(String storeType) {
-        return FileStoreType.HDFS.getValue().equals(storeType);
     }
 
 

@@ -1,5 +1,7 @@
 package com.dqv5.filecenter.support;
 
+import com.dqv5.filecenter.enums.FileStoreType;
+
 import java.io.IOException;
 
 /**
@@ -8,7 +10,15 @@ import java.io.IOException;
  * @author duqian
  * @date 2019-08-21
  */
-public interface IntegrationFileHandler {
+public abstract class AbstractFileHandler {
+
+    /**
+     * 获取存储方式
+     *
+     * @return
+     */
+    public abstract FileStoreType getFileStoreType();
+
     /**
      * 文件上传，返回文件存储信息。
      *
@@ -16,7 +26,7 @@ public interface IntegrationFileHandler {
      * @param fileName 文件名
      * @return 文件存储信息
      */
-    String upload(byte[] data, String fileName) throws IOException;
+    public abstract String upload(byte[] data, String fileName) throws IOException;
 
     /**
      * 文件下载
@@ -25,7 +35,7 @@ public interface IntegrationFileHandler {
      * @return 文件byte数组
      * @throws IOException
      */
-    byte[] download(String storeInfo) throws IOException;
+    public abstract byte[] download(String storeInfo) throws IOException;
 
     /**
      * 是否支持当前存储方式
@@ -33,5 +43,7 @@ public interface IntegrationFileHandler {
      * @param storeType 存储方式
      * @return
      */
-    boolean support(String storeType);
+    public boolean support(String storeType) {
+        return this.getFileStoreType().getValue().equals(storeType);
+    }
 }
