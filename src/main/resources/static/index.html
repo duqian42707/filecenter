@@ -1,0 +1,122 @@
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>File Center | 文件中心</title>
+  <link rel="stylesheet" href="https://cdn.bootcss.com/element-ui/2.12.0/theme-chalk/index.css">
+  <script src="https://cdn.bootcss.com/jquery/3.4.1/jquery.min.js"></script>
+  <script src="https://cdn.bootcss.com/moment.js/2.24.0/moment.min.js"></script>
+  <script src="https://cdn.bootcss.com/axios/0.19.0/axios.min.js"></script>
+  <script src="https://cdn.bootcss.com/vue/2.6.10/vue.min.js"></script>
+  <script src="https://cdn.bootcss.com/element-ui/2.12.0/index.js"></script>
+</head>
+<body>
+<div id="app">
+  <template>
+    <h1> File Center works!</h1>
+    <h2> Total Size:{{totalSize}}</h2>
+    <el-upload
+            :show-file-list="false"
+            action="file"
+            multiple
+            :on-success="loadList"
+            :limit="3">
+      <el-button type="primary">点击上传</el-button>
+      <div slot="tip" class="el-upload__tip">不超过1Mb</div>
+    </el-upload>
+
+    <el-table :data="tableData" border size="small" style="width: 100%" max-height="700">
+      <el-table-column fixed prop="filename" label="文件名"></el-table-column>
+      <el-table-column prop="type" label="文件类型" width="100"></el-table-column>
+      <el-table-column prop="fileSize" label="文件大小" width="100"></el-table-column>
+      <el-table-column prop="uploadDate" label="上传时间" width="200"></el-table-column>
+      <el-table-column prop="md5" label="md5" width="330"></el-table-column>
+      <el-table-column prop="storeType" label="存储类型" width="120"></el-table-column>
+      <el-table-column prop="storeInfo" label="存储详情"></el-table-column>
+      <el-table-column fixed="right" label="操作" width="200">
+        <template slot-scope="scope">
+          <el-button @click="preview(scope.row)" type="text">查看</el-button>
+          <el-button @click="download(scope.row)" type="text">下载</el-button>
+          <el-button @click="deleteFile(scope.row)" type="text">删除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-pagination
+            background
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            :page-sizes="[10, 20, 50, 100]"
+            :current-page="pageNum"
+            :page-size="pageSize"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper">
+    </el-pagination>
+  </template>
+</div>
+
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                totalSize: null,
+                tableData: [],
+                pageNum: 1,
+                pageSize: 10,
+                total: 10
+            }
+        },
+        methods: {
+            handleSizeChange(val) {
+                this.pageSize = val;
+                this.loadList();
+            },
+            handleCurrentChange(val) {
+                this.pageNum = val;
+                this.loadList();
+            },
+            loadList() {
+                axios(`files?pageNum=${this.pageNum}&pageSize=${this.pageSize}`).then(res => {
+                    this.total = res.data.totalElements;
+                    this.tableData = res.data.content.map(i => {
+                        i.uploadDate = moment(new Date(i.uploadDate)).format('YYYY-MM-DD HH:mm:ss');
+                        i.fileSize = this.formatSize(i.length);
+                        return i;
+                    });
+                })
+            },
+            status() {
+                axios(`status`).then(res => {
+                    this.totalSize = this.formatSize(res.data.data);
+                })
+            },
+            preview(row) {
+                window.open(`file/${row.id}`);
+            },
+            download(row) {
+                window.open(`file/${row.id}?t=1`);
+            },
+            deleteFile(row) {
+                axios.delete(`file/${row.id}`).then(res => {
+                    this.loadList();
+                })
+            },
+            formatSize(value) {
+                if (value === null || value === '') {
+                    return '-';
+                }
+                const unitArr = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+                const srcsize = parseFloat(value);
+                const index = Math.floor(Math.log(srcsize) / Math.log(1024));
+                const size = srcsize / Math.pow(1024, index);
+                return size.toFixed(2) + unitArr[index];
+            }
+        },
+        mounted() {
+            this.status();
+            this.loadList();
+        }
+    })
+</script>
+</body>
+</html>
